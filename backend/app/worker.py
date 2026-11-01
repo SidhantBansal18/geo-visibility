@@ -53,26 +53,34 @@ async def _worker() -> None:
             _queue.task_done()
 
 
+def schedule_due() -> list[int]:
+    """Create runs for businesses whose re-check is due. Returns the new run ids."""
+    created: list[int] = []
+    with SessionLocal() as db:
+        due = db.scalars(
+            select(Business).where(Business.recheck_enabled.is_(True), Business.next_run_at <= utcnow())
+        ).all()
+        for b in due:
+            busy = db.scalar(select(Run.id).where(Run.business_id == b.id, Run.status.in_(("queued", "running"))))
+            b.next_run_at = None  # set again when the run finishes
+            db.commit()
+            if busy:
+                continue
+            try:
+                run = create_run(db, b, trigger="scheduled")
+                created.append(run.id)
+                log.info("scheduled re-check for business %s (run %s)", b.id, run.id)
+            except ValueError as e:
+                log.warning("cannot schedule business %s: %s", b.id, e)
+    return created
+
+
 async def _scheduler() -> None:
     s = get_settings()
     while True:
         try:
-            with SessionLocal() as db:
-                due = db.scalars(
-                    select(Business).where(Business.recheck_enabled.is_(True), Business.next_run_at <= utcnow())
-                ).all()
-                for b in due:
-                    busy = db.scalar(select(Run.id).where(Run.business_id == b.id, Run.status.in_(("queued", "running"))))
-                    b.next_run_at = None  # set again when the run finishes
-                    db.commit()
-                    if busy:
-                        continue
-                    try:
-                        run = create_run(db, b, trigger="scheduled")
-                        enqueue(run.id)
-                        log.info("scheduled re-check for business %s (run %s)", b.id, run.id)
-                    except ValueError as e:
-                        log.warning("cannot schedule business %s: %s", b.id, e)
+            for run_id in schedule_due():
+                enqueue(run_id)
         except Exception:  # noqa: BLE001
             log.exception("scheduler tick failed")
         await asyncio.sleep(s.scheduler_poll_s)

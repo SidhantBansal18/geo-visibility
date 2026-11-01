@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from app import worker
 from app.config import get_settings
 from app.db import get_db, init_db
-from app.models import Business, Query, Recommendation, Response, Run
+from app.models import Business, Query, Recommendation, Response, Run, utcnow
 from app.pipeline import profile as profile_mod
 from app.pipeline.engines import ENGINE_LABELS, get_engines
 from app.schemas import BusinessIn, BusinessPatch, InferIn, QueryIn, RecommendationPatch, RunIn, SuggestQueriesIn
@@ -153,8 +154,12 @@ def patch_business(bid: int, body: BusinessPatch, db: Session = Depends(get_db))
     b = _get_business(db, bid)
     for k, v in body.model_dump(exclude_none=True).items():
         setattr(b, k, v.strip() if isinstance(v, str) else v)
-    if body.recheck_enabled is False:
+    if not b.recheck_enabled:
         b.next_run_at = None
+    elif body.recheck_enabled is not None or body.recheck_days is not None:
+        # Re-anchor the schedule on the last completed check (or now).
+        last = next((r.finished_at for r in reversed(b.runs) if r.status == "done"), None)
+        b.next_run_at = (last or utcnow()) + timedelta(days=b.recheck_days)
     db.commit()
     return ser_business(b)
 

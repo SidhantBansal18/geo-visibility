@@ -170,5 +170,9 @@ async def execute_run(run_id: int) -> None:
         run = db.get(Run, run_id)
         if run:
             _set(db, run, status="failed", stage="failed", error=str(e), finished_at=utcnow())
+            # Keep the schedule alive: retry a failed check the next day.
+            if run.business.recheck_enabled and run.business.next_run_at is None:
+                run.business.next_run_at = utcnow() + timedelta(days=1)
+                db.commit()
     finally:
         db.close()

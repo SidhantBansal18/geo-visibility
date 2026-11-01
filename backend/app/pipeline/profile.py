@@ -66,7 +66,8 @@ def template_queries(name: str, category: str, location: str) -> list[dict]:
         {"kind": "use_case", "text": f"Recommend a {cat} company in {loc} for a business or corporate client"},
         {"kind": "use_case", "text": f"What should I look for when hiring a {cat} company in {loc}, and who are good options?"},
         {"kind": "comparison", "text": f"Compare the top {cat} companies in {loc}"},
-        {"kind": "comparison", "text": f"{name} vs other {cat} companies in {loc}: which is better?"},
+        {"kind": "comparison", "text": f"How do the {cat} companies in {loc} compare on price and quality?"},
+        {"kind": "branded", "text": f"{name} vs other {cat} companies in {loc}: which is better?"},
         {"kind": "branded", "text": f"Is {name} a good {cat} company?"},
         {"kind": "branded", "text": f"What do customers say about {name} in {loc}?"},
     ]
@@ -84,8 +85,9 @@ QUERY_SYSTEM = (
     "looking for a business like this one. Return JSON {\"queries\": [{\"kind\", \"text\"}]}. "
     "Write 12 queries: 5 'unbranded' (best/top/recommended <category> in <location>, varied wording), "
     "3 'use_case' (specific situations this business serves, with location), "
-    "2 'comparison' (comparing options; one may name the business), "
-    "2 'branded' (questions about the business by name). Natural, conversational phrasing. "
+    "2 'comparison' (comparing options, without naming this business), "
+    "2 'branded' (questions that name the business). Any query that names the business must be 'branded'. "
+    "Natural, conversational phrasing. "
     "Every non-branded query must include the location."
 )
 

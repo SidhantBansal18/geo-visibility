@@ -56,3 +56,27 @@ def test_full_flow_mock():
         rec = run["recommendations"][0]
         assert c.patch(f"/api/recommendations/{rec['id']}", json={"done": True}).json()["done"] is True
         assert c.delete(f"/api/businesses/{b['id']}").status_code == 204
+
+
+def test_scheduler_creates_due_runs():
+    from datetime import timedelta
+
+    from app import worker
+    from app.db import SessionLocal
+    from app.models import Business, Query, Run, utcnow
+
+    with TestClient(app):
+        with SessionLocal() as db:
+            b = Business(url="https://due.example", domain="due.example", name="Due Co", category="plumbing",
+                         location="Austin, TX", recheck_enabled=True, recheck_days=7,
+                         next_run_at=utcnow() - timedelta(minutes=1),
+                         queries=[Query(text="best plumber in Austin", kind="unbranded")])
+            db.add(b)
+            db.commit()
+            bid = b.id
+        created = worker.schedule_due()
+        assert len(created) == 1
+        assert worker.schedule_due() == []  # not scheduled twice
+        with SessionLocal() as db:
+            run = db.get(Run, created[0])
+            assert run.business_id == bid and run.trigger == "scheduled"
