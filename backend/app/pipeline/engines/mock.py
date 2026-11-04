@@ -18,7 +18,7 @@ from app.util import squash
 PREFIXES = ["Summit", "Lone Star", "BrightPath", "Apex", "Blue Ridge", "Northside", "Premier", "Elite", "Metro", "Golden Hour"]
 
 # Base probability the target is mentioned for a non-branded query, per engine.
-TARGET_RATE = {"chatgpt": 0.30, "gemini": 0.55, "perplexity": 0.18}
+TARGET_RATE = {"chatgpt": 0.30, "claude": 0.25, "gemini": 0.55, "perplexity": 0.18}
 
 
 def _tc(s: str) -> str:
@@ -103,6 +103,7 @@ class MockEngine:
 def mock_engines() -> dict:
     return {
         "chatgpt": MockEngine("chatgpt", "ChatGPT"),
+        "claude": MockEngine("claude", "Claude"),
         "gemini": MockEngine("gemini", "Gemini"),
         "perplexity": MockEngine("perplexity", "Perplexity"),
     }

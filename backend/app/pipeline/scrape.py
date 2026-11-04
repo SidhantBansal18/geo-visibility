@@ -29,9 +29,11 @@ AI_BOTS = {
     "PerplexityBot": "Perplexity",
     "Google-Extended": "Gemini training/grounding",
     "Bingbot": "Bing / Copilot / ChatGPT search index",
-    "ClaudeBot": "Anthropic",
+    "Claude-SearchBot": "Claude search",
+    "Claude-User": "Claude browsing",
+    "ClaudeBot": "Anthropic training",
 }
-SEARCH_CRITICAL_BOTS = {"OAI-SearchBot", "PerplexityBot", "Bingbot", "ChatGPT-User"}
+SEARCH_CRITICAL_BOTS = {"OAI-SearchBot", "PerplexityBot", "Bingbot", "ChatGPT-User", "Claude-SearchBot", "Claude-User"}
 
 PHONE_RE = re.compile(r"(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}")
 

@@ -1,6 +1,9 @@
 """Real engines, each called in its *search-grounded* mode so results reflect what
 consumers see in the product, not the model's offline memory."""
 
+import asyncio
+import re
+
 import httpx
 
 from app.config import get_settings
@@ -104,6 +107,73 @@ async def _resolve_redirect(c: dict, client: httpx.AsyncClient) -> dict:
     return c
 
 
+TAVILY_PROMPT = """Answer the user's question as a helpful assistant would, using the web search
+results below. When you name a business or rely on a fact, cite the result it came from as [n].
+Do not invent businesses that the results do not support.
+
+Search results:
+{sources}
+
+Question: {query}"""
+
+
+class GeminiTavily:
+    """Gemini grounded on Tavily web search instead of Google Search grounding,
+    for keys without grounding quota (e.g. the free tier). Approximates, but is not,
+    what Gemini users see: the search index and ranking differ."""
+
+    id = "gemini"
+    label = "Gemini (Tavily search)"
+
+    def __init__(self, api_key: str, model: str, tavily_key: str):
+        self.api_key, self.model, self.tavily_key = api_key, model, tavily_key
+        # One search per question per process, shared across samples, to save search credits.
+        self._searches: dict[str, asyncio.Task] = {}
+
+    async def _search(self, query: str, client: httpx.AsyncClient) -> list[dict]:
+        r = await client.post(
+            "https://api.tavily.com/search",
+            headers={"Authorization": f"Bearer {self.tavily_key}"},
+            json={"query": query, "max_results": 8, "search_depth": "basic", "country": "united states"},
+        )
+        r.raise_for_status()
+        return [x for x in r.json().get("results", []) if x.get("url")]
+
+    async def search(self, query: str, client: httpx.AsyncClient) -> list[dict]:
+        task = self._searches.get(query)
+        if task is None or (task.done() and task.exception()):
+            task = self._searches[query] = asyncio.create_task(self._search(query, client))
+        return await task
+
+    async def ask(self, query: str, ctx: AskContext, client: httpx.AsyncClient) -> EngineAnswer:
+        results = await self.search(query, client)
+        sources = "\n\n".join(
+            f"[{i}] {x.get('title') or ''}\n{x['url']}\n{(x.get('content') or '')[:1500]}"
+            for i, x in enumerate(results, 1)
+        )
+        r = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent",
+            headers={"x-goog-api-key": self.api_key},
+            json={"contents": [{"role": "user", "parts": [{"text": TAVILY_PROMPT.format(sources=sources, query=query)}]}]},
+        )
+        r.raise_for_status()
+        ans = parse_gemini_response(r.json())
+        ans.citations = cited_results(ans.text, results)
+        return ans
+
+
+def cited_results(text: str, results: list[dict]) -> list[dict]:
+    """Results the answer cites as [n], in citation order; all results if it cites none."""
+    order: list[int] = []
+    for m in re.finditer(r"\[(\d+(?:\s*,\s*\d+)*)\]", text):
+        for n in m.group(1).split(","):
+            k = int(n) - 1
+            if 0 <= k < len(results) and k not in order:
+                order.append(k)
+    picked = [results[k] for k in order] if order else results
+    return [{"url": x["url"], "title": x.get("title")} for x in picked]
+
+
 class PerplexitySonar:
     id = "perplexity"
     label = "Perplexity"
@@ -137,7 +207,9 @@ def configured_engines() -> dict:
     out: dict = {}
     if s.openai_api_key:
         out["chatgpt"] = ChatGPTSearch(s.openai_api_key, s.chatgpt_model)
-    if s.gemini_api_key:
+    if s.gemini_api_key and s.gemini_grounding == "tavily" and s.tavily_api_key:
+        out["gemini"] = GeminiTavily(s.gemini_api_key, s.gemini_model, s.tavily_api_key)
+    elif s.gemini_api_key:
         out["gemini"] = GeminiGrounded(s.gemini_api_key, s.gemini_model)
     if s.perplexity_api_key:
         out["perplexity"] = PerplexitySonar(s.perplexity_api_key, s.perplexity_model)

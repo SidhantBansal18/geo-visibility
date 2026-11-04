@@ -19,6 +19,7 @@
   --accent-ink: #ffffff;
 
   --engine-chatgpt: #2a78d6;
+  --engine-claude: #4a3aa7;
   --engine-gemini: #eb6834;
   --engine-perplexity: #1baf7a;
   --overall: #0b0b0b;
@@ -53,6 +54,7 @@
     --accent: #3987e5;
 
     --engine-chatgpt: #3987e5;
+    --engine-claude: #9085e9;
     --engine-gemini: #d95926;
     --engine-perplexity: #199e70;
     --overall: #f0efec;

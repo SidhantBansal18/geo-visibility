@@ -11,3 +11,4 @@ node_modules/
 frontend/out/
 .DS_Store
 *.bundle
+*.tsbuildinfo

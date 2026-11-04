@@ -217,8 +217,8 @@ export const api = {
     req<{ id: number; done: boolean }>(`/recommendations/${id}`, { method: "PATCH", body: JSON.stringify({ done }) }),
 };
 
-export const ENGINE_LABEL: Record<string, string> = { chatgpt: "ChatGPT", gemini: "Gemini", perplexity: "Perplexity" };
-export const ENGINE_ORDER = ["chatgpt", "gemini", "perplexity"];
+export const ENGINE_LABEL: Record<string, string> = { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", perplexity: "Perplexity" };
+export const ENGINE_ORDER = ["chatgpt", "claude", "gemini", "perplexity"];
 export const engineColor = (e: string) => `var(--engine-${e}, var(--muted))`;
 
 export const KIND_LABEL: Record<QueryKind, string> = {

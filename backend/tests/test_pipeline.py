@@ -1,4 +1,5 @@
-from app.pipeline.engines.live import parse_gemini_response, parse_openai_response, parse_perplexity_response
+from app.pipeline.engines.claude import parse_claude_content
+from app.pipeline.engines.live import cited_results, parse_gemini_response, parse_openai_response, parse_perplexity_response
 from app.pipeline.extract import heuristic_businesses, resolve
 from app.pipeline.recommend import build_recommendations
 from app.pipeline.scoring import aggregate_competitors, compute_summary
@@ -47,6 +48,36 @@ def test_parse_gemini_response():
     assert a.text == "Acme is good."
     assert a.citations[0]["title"] == "yelp.com"
     assert parse_gemini_response({"candidates": []}).text == ""
+
+
+def test_parse_claude_content():
+    content = [
+        {"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {"query": "dentist austin"}},
+        {"type": "web_search_tool_result", "tool_use_id": "s1", "content": [
+            {"type": "web_search_result", "url": "https://a.com", "title": "A"},
+            {"type": "web_search_result", "url": "https://b.com", "title": "B"},
+        ]},
+        {"type": "text", "text": "Try "},
+        {"type": "text", "text": "Acme Dental", "citations": [
+            {"type": "web_search_result_location", "url": "https://b.com", "title": "B", "cited_text": "Acme"},
+            {"type": "web_search_result_location", "url": "https://b.com", "title": "B", "cited_text": "Acme"},
+        ]},
+        {"type": "text", "text": "."},
+    ]
+    a = parse_claude_content(content)
+    assert a.text == "Try Acme Dental."
+    assert a.citations == [{"url": "https://b.com", "title": "B"}]
+    # No inline citations: fall back to the search results; a failed search is skipped.
+    b = parse_claude_content(content[:2] + [{"type": "web_search_tool_result", "content": {"error_code": "max_uses_exceeded"}},
+                                            {"type": "text", "text": "Hi"}])
+    assert [c["url"] for c in b.citations] == ["https://a.com", "https://b.com"]
+
+
+def test_cited_results_follows_citation_order():
+    results = [{"url": f"https://s{i}.com", "title": f"S{i}"} for i in range(1, 5)]
+    a = cited_results("Try Acme [3]. Also Bolt [1, 3] and [9].", results)
+    assert [c["url"] for c in a] == ["https://s3.com", "https://s1.com"]
+    assert len(cited_results("No citations here.", results)) == 4
 
 
 def test_parse_perplexity_response():

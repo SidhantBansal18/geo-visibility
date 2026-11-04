@@ -36,7 +36,7 @@ def test_full_flow_mock():
         b = r.json()
         run = _wait(c, b["run_id"])
         assert run["status"] == "done", run["error"]
-        assert run["progress_done"] == run["progress_total"] == 3 * 3 * 2
+        assert run["progress_done"] == run["progress_total"] == 3 * 4 * 2  # queries x mock engines x samples
         assert run["summary"]["overall"]["visibility"] is not None
         assert run["competitors"] and run["source_gaps"] and run["recommendations"]
 
